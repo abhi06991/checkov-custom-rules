@@ -1,17 +1,26 @@
+# 1) Check fir bith *, * condition
+# 2) also check for arn:*:s3 condistion in resource
+# 3) Also check for s3:* in action
+# 4) include all the highlighted s3 actions from cloudsplaining and check if resource is set to * or s3:*
+
+
+
+
 from checkov.terraform.checks.resource.base_resource_check import BaseResourceCheck
 from checkov.common.models.enums import CheckResult, CheckCategories
 import pprint
 
-class IAMPolicyActionCustomizedCheck(BaseResourceCheck):
+class IAMPermissionsManagementCheck(BaseResourceCheck):
     def __init__(self):
-        name = "Ensure IAM policies does not allow data exfiltration"
-        id = "CKV_AWS_GS_1"
+        name = "Ensure IAM policies does not allow permissions management / resource exposure without constraints"
+        id = "CKV_AWS_GS_2"
         supported_resources = ['aws_iam_policy']
         # CheckCategories are defined in models/enums.py
         categories = [CheckCategories.IAM]
         super().__init__(name=name, id=id, categories=categories, supported_resources=supported_resources)
 
     def scan_resource_conf(self, conf):
+        s3Actions = ["BypassGovernanceRetention", "DeleteAccessPointPolicy", "DeleteBucketPolicy", "ObjectOwnerOverrideToBucketOwner", "PutAccessPointPolicy", "PutAccountPublicAccessBlock", "PutBucketAcl", "PutBucketPolicy", "PutBucketPublicAccessBlock", "PutObjectAcl", "PutObjectVersionAcl"]
         actionWildcardCheck = "false"
         s3ActionCheck = "false"
         resourceWildcardCheck = "false"
@@ -30,7 +39,7 @@ class IAMPolicyActionCustomizedCheck(BaseResourceCheck):
                                 for index2,value2 in enumerate(splitString):
                                     if value2 == "*":
                                         s3ActionCheck = "true"
-                                    elif value2 == "GetObject":
+                                    elif value2 in s3Actions:
                                         s3ActionCheck = "true"
 
                         elif type(actionValue) == list:
@@ -39,12 +48,10 @@ class IAMPolicyActionCustomizedCheck(BaseResourceCheck):
                                     actionWildcardCheck = "true"
                                 splitString = values1.split(':')
                                 if "s3" in splitString:
-                                    if"GetObject" in values1:
-                                        s3ActionCheck = "true"
-                                    else:
-                                        for index2,value2 in enumerate(splitString):
-                                            if value2 == "*":
-                                                s3ActionCheck = "true"
+                                    for index2,value2 in enumerate(splitString):
+                                        if value2 in s3Actions or value2 == "*":
+                                            s3ActionCheck = "true"
+
                     if values == "Resource":
                         resourceValue = policyStatement[values]
                         if type(resourceValue) == str:
@@ -68,9 +75,13 @@ class IAMPolicyActionCustomizedCheck(BaseResourceCheck):
                     return CheckResult.FAILED
                 else:
                     return CheckResult.PASSED
+                # if (actionWildcardCheck == "true" and resourceWildcardCheck == "true"):
+                #     return CheckResult.FAILED
+                # elif (s3ActionCheck == "true" or actionWildcardCheck == "true") and 
+                #     return CheckResult.PASSED
             else:
                 return None
         else:
             return None
 
-scanner = IAMPolicyActionCustomizedCheck()
+scanner = IAMPermissionsManagementCheck()
